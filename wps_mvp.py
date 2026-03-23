@@ -70,8 +70,8 @@ def normalize(column):
 
 # Apply normalization
 df["Norm_Casualties"] = normalize(df["Casualties"])
-df["Norm_Affected"] = normalize(df["Affected_Families"])
-df["Norm_Damaged"] = normalize(df["Damaged_Houses"])
+df["Norm_Affected"] = normalize(df["Affected Families"])
+df["Norm_Damaged"] = normalize(df["Damaged Houses"])
 
 # -------------------------
 # Equal weighting (WSM)
