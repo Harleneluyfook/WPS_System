@@ -31,10 +31,10 @@ uploaded_file = st.file_uploader(
 if uploaded_file is None:
     st.info("Using sample data. Upload a CSV or Excel to use your own dataset.")
     data = {
-        "Barangay": ["A", "B", "C"],
+        "Region": ["Region A", "Region B", "Region C"],
         "Casualties": [5, 2, 8],
-        "Affected_Families": [100, 150, 80],
-        "Damaged_Houses": [20, 10, 30]
+        "Affected Families": [100, 150, 80],
+        "Damaged Houses": [20, 10, 30]
     }
     df = pd.DataFrame(data)
 else:
@@ -62,7 +62,9 @@ if missing_cols:
     st.write("Columns found in your file:", df.columns.tolist())
     st.stop()  # Stop execution to avoid KeyError
 
+# -------------------------
 # Normalization function
+# -------------------------
 def normalize(column):
     if column.max() == column.min():
         return column * 0
@@ -98,4 +100,5 @@ st.dataframe(df_sorted)
 # Visualization
 # -------------------------
 st.subheader("Priority Score Visualization")
-st.bar_chart(df_sorted.set_index("Barangay")["Priority Score"])
+# Use "Region" as the index for bar chart
+st.bar_chart(df_sorted.set_index("Region")["Priority Score"])
