@@ -21,7 +21,7 @@ to prioritize disaster-affected areas based on impact criteria.
 # -------------------------
 # File upload
 # -------------------------
-uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
+uploaded_file = st.file_uploader("Upload CSV file", type=["csv", "xlxs"])
 
 # -------------------------
 # Sample data if no file
