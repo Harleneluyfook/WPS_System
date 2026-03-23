@@ -19,15 +19,17 @@ to prioritize disaster-affected areas based on impact criteria.
 """)
 
 # -------------------------
-# File upload
+# File uploader (CSV or Excel)
 # -------------------------
-uploaded_file = st.file_uploader("Upload CSV file", type=["csv", "xlxs"])
+uploaded_file = st.file_uploader(
+    "Upload CSV or Excel file", type=["csv", "xlsx"]
+)
 
 # -------------------------
-# Sample data if no file
+# Load data
 # -------------------------
 if uploaded_file is None:
-    st.info("Using sample data. Upload a CSV to use your own dataset.")
+    st.info("Using sample data. Upload a CSV or Excel to use your own dataset.")
     data = {
         "Barangay": ["A", "B", "C"],
         "Casualties": [5, 2, 8],
@@ -36,7 +38,13 @@ if uploaded_file is None:
     }
     df = pd.DataFrame(data)
 else:
-    df = pd.read_csv(uploaded_file)
+    if uploaded_file.name.endswith(".csv"):
+        df = pd.read_csv(uploaded_file)
+    elif uploaded_file.name.endswith(".xlsx"):
+        df = pd.read_excel(uploaded_file)
+    else:
+        st.error("File type not supported!")
+        df = pd.DataFrame()
 
 # -------------------------
 # Display input data
