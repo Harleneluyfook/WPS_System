@@ -53,7 +53,7 @@ st.subheader("Input Data")
 st.dataframe(df)
 
 # Expected columns
-expected_cols = ["Region", "Casualties", "Affected_Families", "Damaged_Houses"]
+expected_cols = ["Region", "Casualties", "Affected Families", "Damaged Houses"]
 
 # Check uploaded file columns
 missing_cols = [col for col in expected_cols if col not in df.columns]
