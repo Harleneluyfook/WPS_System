@@ -19,17 +19,17 @@ to prioritize disaster-affected areas based on impact criteria.
 """)
 
 # -------------------------
-# File uploader (CSV or Excel)
+# File uploader (CSV)
 # -------------------------
 uploaded_file = st.file_uploader(
-    "Upload CSV or Excel file", type=["csv", "xlsx"]
+    "Upload CSV file", type=["csv"]
 )
 
 # -------------------------
 # Load data
 # -------------------------
 if uploaded_file is None:
-    st.info("Using sample data. Upload a CSV or Excel to use your own dataset.")
+    st.info("Using sample data. Upload a CSV to use your own dataset.")
     data = {
         "Region": ["Region A", "Region B", "Region C"],
         "Casualties": [5, 2, 8],
@@ -38,13 +38,12 @@ if uploaded_file is None:
     }
     df = pd.DataFrame(data)
 else:
-    if uploaded_file.name.endswith(".csv"):
-        df = pd.read_csv(uploaded_file)
-    elif uploaded_file.name.endswith(".xlsx"):
-        df = pd.read_excel(uploaded_file)
-    else:
-        st.error("File type not supported!")
-        df = pd.DataFrame()
+    df = pd.read_csv(uploaded_file)
+
+# -------------------------
+# Strip spaces from column names
+# -------------------------
+df.columns = df.columns.str.strip()
 
 # -------------------------
 # Display input data
@@ -52,15 +51,26 @@ else:
 st.subheader("Input Data")
 st.dataframe(df)
 
+# -------------------------
 # Expected columns
+# -------------------------
 expected_cols = ["Region", "Casualties", "Affected Families", "Damaged Houses"]
 
-# Check uploaded file columns
 missing_cols = [col for col in expected_cols if col not in df.columns]
 if missing_cols:
     st.error(f"The following required columns are missing: {missing_cols}")
     st.write("Columns found in your file:", df.columns.tolist())
-    st.stop()  # Stop execution to avoid KeyError
+    st.stop()  # Stop execution to avoid errors
+
+# -------------------------
+# Convert numeric columns to float (safe)
+# -------------------------
+numeric_cols = ["Casualties", "Affected Families", "Damaged Houses"]
+for col in numeric_cols:
+    df[col] = pd.to_numeric(df[col], errors="coerce")  # convert strings to NaN
+
+# Fill NaNs with 0
+df[numeric_cols] = df[numeric_cols].fillna(0)
 
 # -------------------------
 # Normalization function
@@ -100,5 +110,4 @@ st.dataframe(df_sorted)
 # Visualization
 # -------------------------
 st.subheader("Priority Score Visualization")
-# Use "Region" as the index for bar chart
 st.bar_chart(df_sorted.set_index("Region")["Priority Score"])
