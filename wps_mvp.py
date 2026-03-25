@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # -------------------------
 # Page config
@@ -35,6 +33,18 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         margin: 10px 0;
     }
+    .high-priority {
+        border-left: 5px solid #ff4444;
+        background-color: #fff5f5;
+    }
+    .medium-priority {
+        border-left: 5px solid #ffaa44;
+        background-color: #fffbf0;
+    }
+    .low-priority {
+        border-left: 5px solid #44ff44;
+        background-color: #f0fff0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -43,8 +53,37 @@ st.markdown("""
 # -------------------------
 if 'lgu_entries' not in st.session_state:
     st.session_state.lgu_entries = []
-if 'show_results' not in st.session_state:
-    st.session_state.show_results = False
+
+# -------------------------
+# Helper function for normalization
+# -------------------------
+def normalize_single(column):
+    """Normalize a single column of data"""
+    if len(column) == 0:
+        return column
+    if column.max() == column.min():
+        return column * 0
+    return (column - column.min()) / (column.max() - column.min())
+
+def calculate_priorities(entries_df):
+    """Calculate priority scores for all entries"""
+    if len(entries_df) == 0:
+        return entries_df
+    
+    # Normalize each criterion
+    entries_df['Norm_Casualties'] = normalize_single(entries_df['Casualties'])
+    entries_df['Norm_Affected'] = normalize_single(entries_df['Affected Families'])
+    entries_df['Norm_Damaged'] = normalize_single(entries_df['Damaged Houses'])
+    
+    # Equal weighting (WSM)
+    weight = 1/3
+    entries_df['Priority Score'] = (
+        entries_df['Norm_Casualties'] * weight +
+        entries_df['Norm_Affected'] * weight +
+        entries_df['Norm_Damaged'] * weight
+    )
+    
+    return entries_df
 
 # -------------------------
 # Title
@@ -79,48 +118,28 @@ with tab1:
         
         if submitted:
             if region_name:
-                # Calculate normalized scores for this single entry
-                # For normalization, we need context from existing entries
-                if st.session_state.lgu_entries:
-                    # Combine with existing entries for normalization context
-                    temp_df = pd.DataFrame(st.session_state.lgu_entries)
-                    temp_df = pd.concat([temp_df, pd.DataFrame([{
-                        'Region': region_name,
-                        'Casualties': casualties,
-                        'Affected Families': affected_families,
-                        'Damaged Houses': damaged_houses
-                    }])], ignore_index=True)
-                    
-                    # Normalize using all data
-                    temp_df['Norm_Casualties'] = normalize_single(temp_df['Casualties'])
-                    temp_df['Norm_Affected'] = normalize_single(temp_df['Affected Families'])
-                    temp_df['Norm_Damaged'] = normalize_single(temp_df['Damaged Houses'])
-                    
-                    weight = 1/3
-                    temp_df['Priority Score'] = (
-                        temp_df['Norm_Casualties'] * weight +
-                        temp_df['Norm_Affected'] * weight +
-                        temp_df['Norm_Damaged'] * weight
-                    )
-                    
-                    # Get the score for the new entry
-                    new_score = temp_df.iloc[-1]['Priority Score']
-                else:
-                    # First entry - assign default score
-                    new_score = 0.5  # Middle priority for first entry
-                
-                # Add to session state
-                st.session_state.lgu_entries.append({
+                # Create temporary entry
+                new_entry = {
                     'Region': region_name,
                     'Casualties': casualties,
                     'Affected Families': affected_families,
                     'Damaged Houses': damaged_houses,
-                    'Priority Score': new_score,
                     'Timestamp': datetime.now(),
                     'Notes': additional_notes
-                })
+                }
                 
-                st.success(f"✅ Added {region_name} to the queue with Priority Score: {new_score:.3f}")
+                # Add to session state
+                st.session_state.lgu_entries.append(new_entry)
+                
+                # Recalculate all priorities
+                df_temp = pd.DataFrame(st.session_state.lgu_entries)
+                df_temp = calculate_priorities(df_temp)
+                
+                # Update session state with calculated scores
+                st.session_state.lgu_entries = df_temp.to_dict('records')
+                
+                st.success(f"✅ Added {region_name} to the queue")
+                st.balloons()
             else:
                 st.error("Please enter a Region/Municipality name")
     
@@ -129,52 +148,68 @@ with tab1:
     st.subheader("📍 Current Response Queue")
     
     if st.session_state.lgu_entries:
-        # Convert to DataFrame for display
         queue_df = pd.DataFrame(st.session_state.lgu_entries)
-        
-        # Recalculate priorities with full context
-        temp_df = queue_df[['Region', 'Casualties', 'Affected Families', 'Damaged Houses']].copy()
-        temp_df['Norm_Casualties'] = normalize_single(temp_df['Casualties'])
-        temp_df['Norm_Affected'] = normalize_single(temp_df['Affected Families'])
-        temp_df['Norm_Damaged'] = normalize_single(temp_df['Damaged Houses'])
-        
-        weight = 1/3
-        temp_df['Priority Score'] = (
-            temp_df['Norm_Casualties'] * weight +
-            temp_df['Norm_Affected'] * weight +
-            temp_df['Norm_Damaged'] * weight
-        )
-        
-        # Sort by priority score
-        queue_df['Priority Score'] = temp_df['Priority Score']
         queue_df_sorted = queue_df.sort_values('Priority Score', ascending=False).reset_index(drop=True)
         
         # Display queue with priority indicators
         for idx, row in queue_df_sorted.iterrows():
-            priority_level = "🔴 HIGH" if row['Priority Score'] >= 0.66 else "🟡 MEDIUM" if row['Priority Score'] >= 0.33 else "🟢 LOW"
+            # Determine priority level and class
+            if row['Priority Score'] >= 0.66:
+                priority_level = "🔴 HIGH PRIORITY"
+                priority_class = "high-priority"
+            elif row['Priority Score'] >= 0.33:
+                priority_level = "🟡 MEDIUM PRIORITY"
+                priority_class = "medium-priority"
+            else:
+                priority_level = "🟢 LOW PRIORITY"
+                priority_class = "low-priority"
             
             with st.container():
-                col1, col2 = st.columns([3, 1])
+                st.markdown(f"""
+                <div class="info-box {priority_class}" style="padding: 15px; margin: 10px 0;">
+                    <h3>#{idx + 1} - {row['Region']}</h3>
+                    <p><strong>Priority Score:</strong> {row['Priority Score']:.3f} - {priority_level}</p>
+                    <p><strong>Impact Data:</strong> {int(row['Casualties'])} casualties, {int(row['Affected Families'])} families affected, {int(row['Damaged Houses'])} houses damaged</p>
+                    <p><small>Submitted: {row['Timestamp'].strftime('%Y-%m-%d %H:%M') if isinstance(row['Timestamp'], datetime) else row['Timestamp']}</small></p>
+                    {f"<p><small>Notes: {row['Notes']}</small></p>" if row.get('Notes') else ""}
+                </div>
+                """, unsafe_allow_html=True)
+                
+                col1, col2, col3 = st.columns([1, 1, 4])
                 with col1:
-                    st.markdown(f"""
-                    <div class="info-box">
-                        <h3>{idx + 1}. {row['Region']}</h3>
-                        <p><strong>Priority Score:</strong> {row['Priority Score']:.3f} - {priority_level}</p>
-                        <p><strong>Impact Data:</strong> {row['Casualties']} casualties, {row['Affected Families']} families affected, {row['Damaged Houses']} houses damaged</p>
-                        <p><small>Submitted: {row['Timestamp'].strftime('%Y-%m-%d %H:%M')}</small></p>
-                        {f"<p><small>Notes: {row['Notes']}</small></p>" if row['Notes'] else ""}
-                    </div>
-                    """, unsafe_allow_html=True)
+                    if st.button(f"⬆️ Move Up", key=f"up_{idx}_{row['Region']}"):
+                        if idx > 0:
+                            # Swap positions
+                            current_idx = queue_df_sorted.index[queue_df_sorted['Region'] == row['Region']].tolist()[0]
+                            if current_idx > 0:
+                                # This is a simplified version - in practice, you might want to implement reordering
+                                st.info("Manual reordering is disabled as priority is calculated automatically")
                 
                 with col2:
-                    if st.button(f"Remove {row['Region']}", key=f"remove_{idx}"):
+                    if st.button(f"🗑️ Remove", key=f"remove_{idx}_{row['Region']}"):
                         st.session_state.lgu_entries = [e for e in st.session_state.lgu_entries if e['Region'] != row['Region']]
                         st.rerun()
         
         # Add clear all button
-        if st.button("🗑️ Clear All Entries", type="secondary"):
-            st.session_state.lgu_entries = []
-            st.rerun()
+        col1, col2, col3 = st.columns([1, 1, 4])
+        with col1:
+            if st.button("🗑️ Clear All Entries", type="secondary"):
+                st.session_state.lgu_entries = []
+                st.rerun()
+        
+        # Show queue statistics
+        st.markdown("---")
+        st.subheader("Queue Statistics")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            high_count = len(queue_df_sorted[queue_df_sorted['Priority Score'] >= 0.66])
+            st.metric("High Priority Areas", high_count)
+        with col2:
+            medium_count = len(queue_df_sorted[(queue_df_sorted['Priority Score'] >= 0.33) & (queue_df_sorted['Priority Score'] < 0.66)])
+            st.metric("Medium Priority Areas", medium_count)
+        with col3:
+            low_count = len(queue_df_sorted[queue_df_sorted['Priority Score'] < 0.33])
+            st.metric("Low Priority Areas", low_count)
             
     else:
         st.info("No entries in the queue yet. Use the form above to add disaster-affected areas.")
@@ -187,48 +222,48 @@ with tab2:
     if st.session_state.lgu_entries:
         # Prepare data for analysis
         results_df = pd.DataFrame(st.session_state.lgu_entries)
-        
-        # Recalculate normalized scores
-        results_df['Norm_Casualties'] = normalize_single(results_df['Casualties'])
-        results_df['Norm_Affected'] = normalize_single(results_df['Affected Families'])
-        results_df['Norm_Damaged'] = normalize_single(results_df['Damaged Houses'])
-        
-        weight = 1/3
-        results_df['Priority Score'] = (
-            results_df['Norm_Casualties'] * weight +
-            results_df['Norm_Affected'] * weight +
-            results_df['Norm_Damaged'] * weight
-        )
-        
         results_df_sorted = results_df.sort_values('Priority Score', ascending=False).reset_index(drop=True)
         
         # Display prioritized regions with enhanced visualization
         st.subheader("🎯 Prioritized Regions")
         
-        # Create a better visualization using plotly
-        fig = px.bar(results_df_sorted, 
-                     x='Region', 
-                     y='Priority Score',
-                     color='Priority Score',
-                     color_continuous_scale=['green', 'yellow', 'red'],
-                     title='Priority Scores by Region',
-                     text='Priority Score')
+        # Create a horizontal bar chart for better visualization
+        chart_data = results_df_sorted.set_index('Region')['Priority Score']
         
-        fig.update_traces(texttemplate='%{text:.3f}', textposition='outside')
-        fig.update_layout(
-            xaxis_title="Region/Municipality",
-            yaxis_title="Priority Score",
-            height=500,
-            showlegend=False
+        # Use Streamlit's native bar chart
+        st.bar_chart(chart_data, height=400)
+        
+        # Add a color-coded table
+        st.subheader("📋 Priority Ranking Table")
+        
+        # Create a styled dataframe
+        display_df = results_df_sorted[['Region', 'Priority Score', 'Casualties', 'Affected Families', 'Damaged Houses']].copy()
+        display_df['Priority Score'] = display_df['Priority Score'].round(3)
+        display_df['Priority Level'] = pd.cut(
+            display_df['Priority Score'],
+            bins=[-float('inf'), 0.33, 0.66, float('inf')],
+            labels=['Low', 'Medium', 'High']
         )
         
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Display detailed results with interpretation
-        st.subheader("📋 Detailed Priority Analysis")
+        # Display the dataframe with styling
+        st.dataframe(
+            display_df,
+            column_config={
+                "Region": "Region/Municipality",
+                "Priority Score": st.column_config.NumberColumn("Priority Score", format="%.3f"),
+                "Casualties": st.column_config.NumberColumn("Casualties", format="%d"),
+                "Affected Families": st.column_config.NumberColumn("Affected Families", format="%d"),
+                "Damaged Houses": st.column_config.NumberColumn("Damaged Houses", format="%d"),
+                "Priority Level": st.column_config.TextColumn("Priority Level"),
+            },
+            use_container_width=True,
+            hide_index=True,
+        )
         
         # Create metrics columns
-        col1, col2, col3 = st.columns(3)
+        st.markdown("---")
+        st.subheader("📈 Summary Metrics")
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             st.metric("Total Areas Assessed", len(results_df_sorted))
@@ -236,53 +271,77 @@ with tab2:
             st.metric("Highest Priority Score", f"{results_df_sorted['Priority Score'].max():.3f}")
         with col3:
             st.metric("Average Priority Score", f"{results_df_sorted['Priority Score'].mean():.3f}")
+        with col4:
+            st.metric("Median Priority Score", f"{results_df_sorted['Priority Score'].median():.3f}")
         
+        # Display detailed analysis with estimated response times
         st.markdown("---")
+        st.subheader("⏱️ Estimated Response Timeline")
         
-        # Display priority queue with interpretation
         for idx, row in results_df_sorted.iterrows():
-            priority_level = "🔴 HIGH" if row['Priority Score'] >= 0.66 else "🟡 MEDIUM" if row['Priority Score'] >= 0.33 else "🟢 LOW"
-            
-            # Calculate estimated response time
-            if idx == 0:
-                response_time = "Immediate (Within 24 hours)"
-                time_color = "red"
-            elif idx == 1:
-                response_time = "Short-term (24-48 hours)"
-                time_color = "orange"
-            elif idx == 2:
-                response_time = "Medium-term (2-3 days)"
-                time_color = "orange"
+            # Determine priority level
+            if row['Priority Score'] >= 0.66:
+                priority_level = "🔴 HIGH"
+                priority_color = "#ff4444"
+                response_hours = "0-24"
+            elif row['Priority Score'] >= 0.33:
+                priority_level = "🟡 MEDIUM"
+                priority_color = "#ffaa44"
+                response_hours = "24-72"
             else:
-                hours = 48 + (idx - 2) * 12
-                response_time = f"Extended ({hours} hours)"
-                time_color = "green"
+                priority_level = "🟢 LOW"
+                priority_color = "#44ff44"
+                response_hours = "72+"
             
-            with st.expander(f"{idx + 1}. {row['Region']} - {priority_level}", expanded=(idx==0)):
+            # Calculate estimated deployment time
+            if idx == 0:
+                deployment_time = "Immediate (Within 24 hours)"
+                time_icon = "🚨"
+            elif idx == 1:
+                deployment_time = "Urgent (24-48 hours)"
+                time_icon = "⚠️"
+            elif idx == 2:
+                deployment_time = "Scheduled (48-72 hours)"
+                time_icon = "📅"
+            else:
+                hours = 72 + (idx - 2) * 12
+                deployment_time = f"Scheduled ({hours}+ hours)"
+                time_icon = "⏰"
+            
+            with st.expander(f"{idx + 1}. {row['Region']} - {priority_level} Priority", expanded=(idx==0)):
                 col1, col2 = st.columns(2)
                 
                 with col1:
                     st.markdown(f"""
                     **Priority Score:** {row['Priority Score']:.3f}  
                     **Priority Level:** {priority_level}  
-                    **Estimated Response Time:** <span style='color:{time_color}; font-weight:bold'>{response_time}</span>
-                    """, unsafe_allow_html=True)
+                    **Response Timeframe:** {response_hours} hours  
+                    **Deployment Status:** {time_icon} {deployment_time}
+                    """)
                     
                     st.markdown("**Impact Metrics:**")
-                    st.write(f"- Casualties: {row['Casualties']}")
-                    st.write(f"- Affected Families: {row['Affected Families']}")
-                    st.write(f"- Damaged Houses: {row['Damaged Houses']}")
+                    st.write(f"- Casualties: {int(row['Casualties'])}")
+                    st.write(f"- Affected Families: {int(row['Affected Families'])}")
+                    st.write(f"- Damaged Houses: {int(row['Damaged Houses'])}")
                 
                 with col2:
-                    st.markdown("**Normalized Scores:**")
+                    st.markdown("**Normalized Impact Scores:**")
                     st.write(f"- Casualties Impact: {row['Norm_Casualties']:.3f}")
                     st.write(f"- Families Impact: {row['Norm_Affected']:.3f}")
                     st.write(f"- Housing Impact: {row['Norm_Damaged']:.3f}")
                     
+                    # Resource allocation suggestion
+                    if row['Priority Score'] >= 0.66:
+                        st.warning("**Resource Allocation:** Priority 1 - Immediate deployment of full response team")
+                    elif row['Priority Score'] >= 0.33:
+                        st.info("**Resource Allocation:** Priority 2 - Deploy assessment team, prepare resources")
+                    else:
+                        st.success("**Resource Allocation:** Priority 3 - Monitor situation, schedule regular assessment")
+                    
                     if row.get('Notes'):
                         st.markdown(f"**Notes:** {row['Notes']}")
         
-        # Interpretation and recommendations
+        # Strategic recommendations
         st.markdown("---")
         st.subheader("💡 Strategic Recommendations")
         
@@ -291,41 +350,94 @@ with tab2:
         medium_priority_count = len(results_df_sorted[(results_df_sorted['Priority Score'] >= 0.33) & (results_df_sorted['Priority Score'] < 0.66)])
         low_priority_count = len(results_df_sorted[results_df_sorted['Priority Score'] < 0.33])
         
+        # Calculate total impact
+        total_casualties = results_df_sorted['Casualties'].sum()
+        total_families = results_df_sorted['Affected Families'].sum()
+        total_houses = results_df_sorted['Damaged Houses'].sum()
+        
         st.markdown(f"""
         <div class="priority-card">
-            <h3>Response Strategy Based on Priority Distribution</h3>
-            <p><strong>Immediate Response Required:</strong> {high_priority_count} area(s) need urgent attention.</p>
+            <h3>📋 Response Strategy Based on Priority Distribution</h3>
+            <p><strong>Immediate Response Required:</strong> {high_priority_count} area(s) need urgent attention within 24 hours.</p>
             <p><strong>Secondary Response:</strong> {medium_priority_count} area(s) should be addressed within 48-72 hours.</p>
             <p><strong>Monitored Response:</strong> {low_priority_count} area(s) can be scheduled for routine assessment.</p>
             <br>
-            <h4>Resource Allocation Recommendation:</h4>
+            <h4>📊 Total Impact Assessment:</h4>
             <ul>
-                <li>Allocate <strong>{max(40, high_priority_count * 30)}%</strong> of available resources to high-priority areas</li>
-                <li>Distribute <strong>{max(30, medium_priority_count * 20)}%</strong> of resources to medium-priority areas</li>
-                <li>Reserve <strong>{max(20, low_priority_count * 10)}%</strong> for low-priority and emerging needs</li>
+                <li>Total Casualties: {int(total_casualties)}</li>
+                <li>Total Affected Families: {int(total_families)}</li>
+                <li>Total Damaged Houses: {int(total_houses)}</li>
             </ul>
+            <br>
+            <h4>🎯 Resource Allocation Recommendation:</h4>
+            <ul>
+                <li>Allocate <strong>{min(70, 30 + high_priority_count * 20)}%</strong> of available resources to high-priority areas</li>
+                <li>Distribute <strong>{min(50, 20 + medium_priority_count * 15)}%</strong> of resources to medium-priority areas</li>
+                <li>Reserve <strong>{max(10, 20 - low_priority_count * 5)}%</strong> for low-priority and emerging needs</li>
+            </ul>
+            <br>
+            <h4>📌 Key Action Items:</h4>
+            <ol>
+                <li>Immediately mobilize response teams to {high_priority_count} high-priority area(s)</li>
+                <li>Conduct detailed damage assessment for medium-priority areas</li>
+                <li>Establish communication channels with local government units</li>
+                <li>Coordinate resource allocation based on priority scores</li>
+            </ol>
         </div>
         """, unsafe_allow_html=True)
         
         # Export functionality
         st.markdown("---")
-        if st.button("📥 Export Priority Report (CSV)"):
-            export_df = results_df_sorted[['Region', 'Priority Score', 'Casualties', 'Affected Families', 'Damaged Houses']]
-            csv = export_df.to_csv(index=False)
-            st.download_button(
-                label="Download CSV",
-                data=csv,
-                file_name=f"disaster_priority_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
-            )
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("📥 Export Priority Report (CSV)", use_container_width=True):
+                export_df = results_df_sorted[['Region', 'Priority Score', 'Casualties', 'Affected Families', 'Damaged Houses', 'Priority Level']].copy()
+                export_df['Priority Score'] = export_df['Priority Score'].round(3)
+                export_df['Priority Level'] = pd.cut(
+                    export_df['Priority Score'],
+                    bins=[-float('inf'), 0.33, 0.66, float('inf')],
+                    labels=['Low', 'Medium', 'High']
+                )
+                csv = export_df.to_csv(index=False)
+                st.download_button(
+                    label="Click to Download CSV",
+                    data=csv,
+                    file_name=f"disaster_priority_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+        
+        # Add methodology explanation
+        with st.expander("ℹ️ About the Prioritization Methodology"):
+            st.markdown("""
+            ### Weighted Priority Scheduler (WPS) Methodology
+            
+            This system uses the **Weighted Sum Model (WSM)** with equal weighting for disaster prioritization:
+            
+            **1. Data Normalization:**
+            - Min-max normalization is applied to each criterion
+            - Formula: `(value - min) / (max - min)`
+            - Results in normalized scores between 0 and 1
+            
+            **2. Equal Weighting:**
+            - Casualties: 33.3% weight
+            - Affected Families: 33.3% weight
+            - Damaged Houses: 33.3% weight
+            
+            **3. Priority Score Calculation:**
+            - `Score = (Norm_Casualties × 0.333) + (Norm_Affected × 0.333) + (Norm_Damaged × 0.333)`
+            
+            **4. Priority Classification:**
+            - High Priority: Score ≥ 0.66
+            - Medium Priority: 0.33 ≤ Score < 0.66
+            - Low Priority: Score < 0.33
+            
+            **5. Response Time Estimation:**
+            - Based on queue position and priority score
+            - Higher priority areas receive immediate response
+            - Lower priority areas scheduled based on available resources
+            """)
             
     else:
         st.warning("No data available. Please go to the 'LGU Data Entry & Queue' tab to add disaster-affected areas first.")
         st.info("💡 Tip: You can add multiple LGUs to compare their priority scores and get response time estimates.")
-
-# Helper function for normalization
-def normalize_single(column):
-    """Normalize a single column of data"""
-    if column.max() == column.min():
-        return column * 0
-    return (column - column.min()) / (column.max() - column.min())
