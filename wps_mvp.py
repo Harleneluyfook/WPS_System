@@ -154,7 +154,7 @@ with tab2:
         st.markdown("---")
 
         # PROGRESS BAR
-        st.markdown("### 📈 Position in Queue")
+        st.markdown("### Position in Queue")
 
         progress = 1 - (rank / total)
         st.progress(progress)
@@ -201,3 +201,40 @@ with tab2:
             msg = "Monitoring / delayed response"
 
         st.info(msg)
+    
+# FULL PRIORITY QUEUE
+st.markdown("---")
+st.markdown("##  Full Priority Queue")
+
+df_display = df.copy()
+df_display["Rank"] = df_display.index + 1
+
+for i, row in df_display.iterrows():
+    rank = int(row["Rank"])
+
+    # Highlight top 3
+    if rank == 1:
+        color = "#ff4b4b"   # red
+    elif rank == 2:
+        color = "#ff944d"   # orange
+    elif rank == 3:
+        color = "#ffd11a"   # yellow
+    else:
+        color = "#1f77b4"   # blue
+
+    st.markdown(f"""
+    <div style="
+        padding:12px;
+        margin:6px 0;
+        border-radius:10px;
+        background-color:{color};
+        color:white;
+        font-weight:600;
+    ">
+        #{rank} — {row['Barangay']} <br>
+        Score: {row['Priority Score']:.3f} |
+        Affected: {int(row['Affected Families'])} |
+        Casualties: {int(row['Casualties'])} |
+        Damaged: {int(row['Damaged Houses'])}
+    </div>
+    """, unsafe_allow_html=True)
