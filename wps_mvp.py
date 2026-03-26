@@ -1,16 +1,13 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from datetime import datetime
 
 st.set_page_config(page_title="WPS Dashboard", layout="wide")
 
-st.title("🏥 Weighted Priority Scheduler")
+st.title("Weighted Priority Scheduler")
 st.caption("Disaster Response Prioritization System")
 
-# -------------------------
-# SAMPLE BARANGAY DATA
-# -------------------------
+# SAMPLE DATA
 data = [
 ("A. Bonifacio-Caguioa-Rimando (Abcr)",15),
 ("Abanao-Zandueta-Kayong-Chugum-Otek (Azkco)",284),
@@ -25,44 +22,13 @@ data = [
 ("Aurora Hill, South Central",62),
 ("Bakakeng Central",112),
 ("Bakakeng North",35),
-("Bal-Marcoville (Marcoville)",26),
 ("Balsigan",40),
-("Bayan Park East",11),
-("Bayan Park Village",63),
-("Bayan Park West (Bayan Park)",57),
-("Bgh Compound",69),
 ("Brookside",261),
-("Brookspoint",43),
-("Cabinet Hill-Teacher's Camp",54),
-("Camdas Subdivision",14),
 ("Camp 7",137),
-("Camp 8",33),
-("Camp Allen",27),
 ("Campo Filipino",84),
 ("City Camp Central",308),
-("City Camp Proper",18),
-("Country Club Village",5),
-("Cresencia Village",33),
-("Dagsian, Lower",40),
-("Dagsian, Upper",18),
-("Dizon Subdivision",57),
 ("Dominican Hill-Mirador",164),
-("Dontogan",75),
-("Dps Area",20),
-("Engineers Hill",19),
-("Fairview Village",83),
-("Ferdinand (Happy Homes-Campo Sioco)",54),
-("Fort Del Pilar",21),
-("Gabriela Silang",19),
-("Gibraltar",34),
-("Greenwater Village",47),
-("Guisad Central",46),
-("Guisad Sorong",117),
-("Happy Hollow",67),
 ("Harrison-Claudio Carantes",325),
-("Hillside",24),
-("Holy Ghost Extension",29),
-("Honeymoon (Honeymoon-Holy Ghost)",121),
 ("Irisan",989),
 ("Kias",181),
 ("Outlook Drive",96),
@@ -77,92 +43,162 @@ data = [
 
 df = pd.DataFrame(data, columns=["Barangay", "Affected Families"])
 
-# Add RANDOM values for missing columns
+# Random values (for demo only)
 np.random.seed(1)
 df["Casualties"] = np.random.randint(0, 20, size=len(df))
 df["Damaged Houses"] = np.random.randint(10, 300, size=len(df))
 
-# -------------------------
-# NORMALIZATION FUNCTION
-# -------------------------
+# FUNCTIONS
 def normalize(col):
+    if col.max() == col.min():
+        return col * 0
     return (col - col.min()) / (col.max() - col.min())
 
-df["Norm_Casualties"] = normalize(df["Casualties"])
-df["Norm_Affected"] = normalize(df["Affected Families"])
-df["Norm_Damaged"] = normalize(df["Damaged Houses"])
+def compute_priority(df):
+    # Normalize
+    df["Norm_Casualties"] = normalize(df["Casualties"])
+    df["Norm_Affected"] = normalize(df["Affected Families"])
+    df["Norm_Damaged"] = normalize(df["Damaged Houses"])
 
-df["Priority Score"] = (
-    df["Norm_Casualties"] +
-    df["Norm_Affected"] +
-    df["Norm_Damaged"]
-) / 3
+    # Explicit weights (WSM)
+    w1 = 0.33
+    w2 = 0.33
+    w3 = 0.33
 
-df = df.sort_values("Priority Score", ascending=False).reset_index(drop=True)
+    df["Priority Score"] = (
+        df["Norm_Casualties"] * w1 +
+        df["Norm_Affected"] * w2 +
+        df["Norm_Damaged"] * w3
+    )
 
-# -------------------------
-# USER INPUT (clean UI)
-# -------------------------
-st.subheader("Select Barangay")
+    return df.sort_values("Priority Score", ascending=False).reset_index(drop=True)
 
-selected = st.selectbox(
-    "Choose a barangay",
-    df["Barangay"].tolist()
-)
+df = compute_priority(df)
 
-selected_row = df[df["Barangay"] == selected].iloc[0]
+# SESSION STATE
+if "selected_barangay" not in st.session_state:
+    st.session_state.selected_barangay = None
 
-st.markdown("### 📍 Selected Barangay Overview")
-col1, col2, col3 = st.columns(3)
+# TABS (Inputs and Result)
+tab1, tab2 = st.tabs(["Input", "Results"])
 
-col1.metric("Affected Families", int(selected_row["Affected Families"]))
-col2.metric("Casualties", int(selected_row["Casualties"]))
-col3.metric("Damaged Houses", int(selected_row["Damaged Houses"]))
+# TAB 1 — INPUT
+with tab1:
+    st.subheader("Barangay Disaster Input")
 
-st.markdown("---")
+    selected = st.selectbox(
+        "Choose Barangay",
+        df["Barangay"].tolist()
+    )
 
-# -------------------------
-# PRIORITY RANKING (USER FRIENDLY)
-# -------------------------
-st.subheader("🚨 Priority Ranking")
+    st.markdown("### Enter Disaster Impact Data")
 
-for i, row in df.head(10).iterrows():
-    if i == 0:
-        badge = "🥇 TOP PRIORITY"
-    elif i == 1:
-        badge = "🥈 NEXT"
-    elif i == 2:
-        badge = "🥉 THIRD"
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        casualties = st.number_input("Casualties", min_value=0, step=1)
+
+    with col2:
+        affected = st.number_input("Affected Families", min_value=0, step=1)
+
+    with col3:
+        damaged = st.number_input("Damaged Houses", min_value=0, step=1)
+
+    if st.button("Add to Assessment"):
+        # Update selected barangay data
+        df.loc[df["Barangay"] == selected, "Casualties"] = casualties
+        df.loc[df["Barangay"] == selected, "Affected Families"] = affected
+        df.loc[df["Barangay"] == selected, "Damaged Houses"] = damaged
+
+        # Recompute priority after input
+        updated_df = compute_priority(df)
+
+        # Save to session
+        st.session_state.df = updated_df
+        st.session_state.selected_barangay = selected
+
+        st.success(f"{selected} data updated and prioritized")
+
+# TAB 2 — RESULTS
+with tab2:
+    st.subheader("Disaster Priority Overview")
+
+    df = st.session_state.get("df", df)
+    selected = st.session_state.get("selected_barangay", None)
+
+    if selected is None:
+        st.warning("Please select and input data in the Input tab first.")
     else:
-        badge = f"#{i+1}"
+        selected_row = df[df["Barangay"] == selected].iloc[0]
+        rank = df[df["Barangay"] == selected].index[0] + 1
+        total = len(df)
 
-    highlight = "background-color:#fff3cd;" if row["Barangay"] == selected else ""
+        # TOP SUMMARY (POSITION)
+        st.markdown("### Your Barangay Status")
 
-    st.markdown(f"""
-    <div style="padding:12px; border-radius:10px; margin:6px 0; {highlight}">
-        <strong>{badge} - {row['Barangay']}</strong><br>
-        Score: {row['Priority Score']:.3f}  
-        | Families: {int(row['Affected Families'])}  
-        | Casualties: {int(row['Casualties'])}  
-        | Damaged: {int(row['Damaged Houses'])}
-    </div>
-    """, unsafe_allow_html=True)
+        col1, col2, col3, col4 = st.columns(4)
 
-# -------------------------
-# SIMPLE TIMELINE (FLARE ✨)
-# -------------------------
-st.markdown("---")
-st.subheader("⏱️ Estimated Response Timeline")
+        col1.metric("Rank", f"#{rank}")
+        col2.metric("Out of", total)
+        col3.metric("Priority Score", f"{selected_row['Priority Score']:.3f}")
+        
+        if rank == 1:
+            level = "HIGH PRIORITY"
+        elif rank <= 5:
+            level = "MEDIUM PRIORITY"
+        else:
+            level = "LOW PRIORITY"
 
-rank = df[df["Barangay"] == selected].index[0] + 1
+        col4.metric("Priority Level", level)
 
-if rank == 1:
-    msg = "🚨 Immediate response (within 24 hours)"
-elif rank <= 3:
-    msg = "⚠️ Urgent response (24–48 hours)"
-elif rank <= 6:
-    msg = "📅 Scheduled (2–3 days)"
-else:
-    msg = "⏳ Monitoring / delayed response"
+        st.markdown("---")
 
-st.info(f"**{selected} is ranked #{rank}** → {msg}")
+        # VISUAL POSITION (FEELS LIKE PROGRESS)
+        st.markdown("### 📈 Position in Queue")
+
+        progress = 1 - (rank / total)
+        st.progress(progress)
+
+        st.caption(f"{selected} is ahead of {total - rank} barangays")
+
+        # TOP PRIORITY
+        st.markdown("---")
+        st.markdown("### Top Priority Barangays")
+
+        top5 = df.head(5)
+
+        for i, row in top5.iterrows():
+            badge = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][i]
+
+            st.markdown(f"""
+            <div style="padding:10px; border-radius:8px; margin:5px 0; background-color:#f8f9fa;">
+                <strong>{badge} {row['Barangay']}</strong><br>
+                Score: {row['Priority Score']:.3f}
+            </div>
+            """, unsafe_allow_html=True)
+
+        # SELECTED BARANGAY DETAIL
+        st.markdown("---")
+        st.markdown("Detailed Impact")
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("Affected Families", int(selected_row["Affected Families"]))
+        col2.metric("Casualties", int(selected_row["Casualties"]))
+        col3.metric("Damaged Houses", int(selected_row["Damaged Houses"]))
+
+        # RESPONSE TIMELINE
+        st.markdown("---")
+        st.markdown("### ⏱️ Response Estimate")
+
+        if rank == 1:
+            msg = "Immediate response (within 24 hours)"
+        elif rank <= 3:
+            msg = "Urgent (24–48 hours)"
+        elif rank <= 6:
+            msg = "Scheduled (2–3 days)"
+        else:
+            msg = "Monitoring / delayed response"
+
+        st.info(msg)
+    
