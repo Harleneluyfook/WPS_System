@@ -1,187 +1,180 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from datetime import datetime
 
 # -------------------------
-# Page config
+# PAGE CONFIG
 # -------------------------
-st.set_page_config(page_title="WPS Disaster Prioritization", layout="wide")
+st.set_page_config(
+    page_title="Baguio WPS Dashboard",
+    layout="wide"
+)
+
+st.title("Baguio City Disaster Prioritization Dashboard")
+st.caption("Weighted Priority Scheduler for Disaster Response")
 
 # -------------------------
-# Session state
+# SAMPLE BARANGAYS (replace later with full 128)
 # -------------------------
-if 'lgu_entries' not in st.session_state:
-    st.session_state.lgu_entries = []
-
-# -------------------------
-# Sample Barangay List (replace later with full 128)
-# -------------------------
-barangay_list = [
+barangays = [
     "Abanao-Zandueta-Kayong-Chugum-Otek",
     "Alfonso Tabora",
     "Andres Bonifacio",
-    "Aurelio Mendoza",
+    "Aurora Hill Proper",
+    "Bakakeng Central",
+    "Bal-Marcoville",
+    "Balsigan",
+    "Cabinet Hill-Teacher's Camp",
     "Camp 7",
-    "Camp 8",
-    "Dominican Hill",
-    "Irisan",
-    "Loakan Proper",
-    "Sample Barangay A",
-    "Sample Barangay B"
+    "City Camp Proper"
 ]
 
 # -------------------------
-# Normalize function
+# SESSION STATE
 # -------------------------
-def normalize(column):
-    if len(column) == 0:
-        return column
-    if column.max() == column.min():
-        return column * 0
-    return (column - column.min()) / (column.max() - column.min())
+if "entries" not in st.session_state:
+    st.session_state.entries = []
 
 # -------------------------
-# Priority Calculation
+# FUNCTIONS
 # -------------------------
-def calculate_priorities(df):
-    if len(df) == 0:
-        return df
+def normalize(col):
+    if len(col) == 0:
+        return col
+    if col.max() == col.min():
+        return col * 0
+    return (col - col.min()) / (col.max() - col.min())
 
-    df['Norm_Casualties'] = normalize(df['Casualties'])
-    df['Norm_Affected'] = normalize(df['Affected Families'])
-    df['Norm_Damaged'] = normalize(df['Damaged Houses'])
+def compute_priority(df):
+    df["Norm_Casualties"] = normalize(df["Casualties"])
+    df["Norm_Families"] = normalize(df["Affected Families"])
+    df["Norm_Houses"] = normalize(df["Damaged Houses"])
 
-    weight = 1/3
-    df['Priority Score'] = (
-        df['Norm_Casualties'] * weight +
-        df['Norm_Affected'] * weight +
-        df['Norm_Damaged'] * weight
-    )
+    df["Priority Score"] = (
+        df["Norm_Casualties"] +
+        df["Norm_Families"] +
+        df["Norm_Houses"]
+    ) / 3
 
     return df
 
 # -------------------------
-# Title
-# -------------------------
-st.title("Weighted Priority Scheduler (WPS)")
-st.caption("Simple disaster prioritization tool")
-
-# -------------------------
-# Tabs
+# TABS
 # -------------------------
 tab1, tab2 = st.tabs(["Data Entry", "Results"])
 
-# ================= TAB 1 =================
+# =========================
+# TAB 1: INPUT
+# =========================
 with tab1:
-    st.subheader("Enter Disaster Data")
+    st.header("Barangay Impact Input")
 
     with st.form("input_form"):
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
-            region_name = st.selectbox("Select Barangay", barangay_list)
-            casualties = st.number_input("Casualties", min_value=0, value=0)
+            barangay = st.selectbox("Select Barangay", barangays)
 
         with col2:
-            affected = st.number_input("Affected Families", min_value=0, value=0)
-            damaged = st.number_input("Damaged Houses", min_value=0, value=0)
+            casualties = st.number_input("Casualties", 0, 10000, 0)
 
-        submit = st.form_submit_button("Add to Queue")
+        with col3:
+            families = st.number_input("Affected Families", 0, 100000, 0)
+
+        houses = st.number_input("Damaged Houses", 0, 100000, 0)
+
+        submit = st.form_submit_button("Add Entry")
 
         if submit:
-            new_entry = {
-                "Region": region_name,
+            new_data = {
+                "Barangay": barangay,
                 "Casualties": casualties,
-                "Affected Families": affected,
-                "Damaged Houses": damaged,
-                "Timestamp": datetime.now()
+                "Affected Families": families,
+                "Damaged Houses": houses,
+                "Time": datetime.now()
             }
 
-            st.session_state.lgu_entries.append(new_entry)
+            st.session_state.entries.append(new_data)
 
-            df_temp = pd.DataFrame(st.session_state.lgu_entries)
-            df_temp = calculate_priorities(df_temp)
+            df = pd.DataFrame(st.session_state.entries)
+            df = compute_priority(df)
 
-            st.session_state.lgu_entries = df_temp.to_dict("records")
+            st.session_state.entries = df.to_dict("records")
 
-            st.success(f"{region_name} added to queue.")
+            st.success(f"{barangay} added successfully")
 
-    # -------------------------
-    # Queue Display
-    # -------------------------
     st.markdown("---")
-    st.subheader("Current Queue")
 
-    if st.session_state.lgu_entries:
-        df = pd.DataFrame(st.session_state.lgu_entries)
-        df_sorted = df.sort_values("Priority Score", ascending=False).reset_index(drop=True)
+    st.subheader("Current Entries")
 
-        for i, row in df_sorted.iterrows():
-            st.markdown(f"### {i+1}. {row['Region']}")
-            st.write(f"Priority Score: {row['Priority Score']:.3f}")
-            st.write(f"Casualties: {int(row['Casualties'])}")
-            st.write(f"Affected Families: {int(row['Affected Families'])}")
-            st.write(f"Damaged Houses: {int(row['Damaged Houses'])}")
-            st.markdown("---")
-
-        if st.button("Clear All"):
-            st.session_state.lgu_entries = []
-            st.rerun()
-
+    if st.session_state.entries:
+        df = pd.DataFrame(st.session_state.entries)
+        st.dataframe(df, use_container_width=True)
     else:
-        st.info("No data yet.")
+        st.info("No data yet")
 
-# ================= TAB 2 =================
+# =========================
+# TAB 2: RESULTS
+# =========================
 with tab2:
-    st.subheader("Results")
+    st.header("Priority Ranking")
 
-    if st.session_state.lgu_entries:
-        df = pd.DataFrame(st.session_state.lgu_entries)
-        df_sorted = df.sort_values("Priority Score", ascending=False).reset_index(drop=True)
+    if not st.session_state.entries:
+        st.warning("No data available")
+    else:
+        df = pd.DataFrame(st.session_state.entries)
+        df = df.sort_values("Priority Score", ascending=False).reset_index(drop=True)
 
-        # Chart
-        st.bar_chart(df_sorted.set_index("Region")["Priority Score"])
+        st.subheader("Ranking Overview")
 
-        # Table
-        st.dataframe(
-            df_sorted[['Region', 'Priority Score', 'Casualties', 'Affected Families', 'Damaged Houses']],
-            use_container_width=True
-        )
-
-        # -------------------------
-        # Simple Response Plan
-        # -------------------------
-        st.markdown("---")
-        st.subheader("Response Plan")
-
-        for idx, row in df_sorted.iterrows():
-
-            if row['Priority Score'] >= 0.66:
-                priority = "High"
-                icon = "🔴"
-                eta = "Immediate (within 24 hrs)"
-            elif row['Priority Score'] >= 0.33:
-                priority = "Medium"
-                icon = "🟡"
-                eta = "Within 24–72 hrs"
+        for i, row in df.iterrows():
+            if row["Priority Score"] >= 0.66:
+                tag = "HIGH PRIORITY"
+            elif row["Priority Score"] >= 0.33:
+                tag = "MEDIUM PRIORITY"
             else:
-                priority = "Low"
-                icon = "🟢"
-                eta = "After 72 hrs"
-
-            if idx == 0:
-                wait = "No wait time"
-            else:
-                wait = f"~{idx * 12} hrs after previous"
+                tag = "LOW PRIORITY"
 
             st.markdown(f"""
-            **{idx + 1}. {row['Region']}**  
-            {icon} Priority: {priority}  
-            ⏱ Estimated Response: {eta}  
-            ⌛ Queue Delay: {wait}
+            ### #{i+1} {row['Barangay']}
+            Priority Score: **{row['Priority Score']:.3f}**  
+            {tag}  
+            
+            Casualties: {int(row['Casualties'])}  
+            Families: {int(row['Affected Families'])}  
+            Houses: {int(row['Damaged Houses'])}  
             """)
 
             st.markdown("---")
 
-    else:
-        st.warning("No data available.")
+        # -------------------------
+        # RESPONSE TIMELINE (simple, clean)
+        # -------------------------
+        st.subheader("Estimated Response Order")
+
+        for i, row in df.iterrows():
+            if i == 0:
+                time = "Immediate response (within 24 hrs)"
+            elif i == 1:
+                time = "Next deployment (24–48 hrs)"
+            elif i == 2:
+                time = "Scheduled (48–72 hrs)"
+            else:
+                time = f"Queue position {i+1}"
+
+            st.write(f"{i+1}. {row['Barangay']} — {time}")
+
+        # -------------------------
+        # SIMPLE RECOMMENDATION
+        # -------------------------
+        st.markdown("---")
+        st.subheader("Recommendation Summary")
+
+        total = len(df)
+        high = len(df[df["Priority Score"] >= 0.66])
+
+        st.info(
+            f"{high} out of {total} barangays require immediate response. "
+            "Resources should be focused on the highest-ranked areas first."
+        )
