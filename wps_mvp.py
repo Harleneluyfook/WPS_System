@@ -7,47 +7,6 @@ st.set_page_config(page_title="WPS Dashboard", layout="wide")
 st.title("Weighted Priority Scheduler")
 st.caption("Disaster Response Prioritization System")
 
-# SAMPLE DATA
-data = [
-("A. Bonifacio-Caguioa-Rimando (Abcr)",15),
-("Abanao-Zandueta-Kayong-Chugum-Otek (Azkco)",284),
-("Alfonso Tabora",26),
-("Ambiong",40),
-("Andres Bonifacio (Lower Bokawkan)",37),
-("Apugan-Loakan",58),
-("Asin Road",356),
-("Atok Trail",398),
-("Aurora Hill Proper (Malvar-Sgt. Floresca)",20),
-("Aurora Hill, North Central",58),
-("Aurora Hill, South Central",62),
-("Bakakeng Central",112),
-("Bakakeng North",35),
-("Balsigan",40),
-("Brookside",261),
-("Camp 7",137),
-("Campo Filipino",84),
-("City Camp Central",308),
-("Dominican Hill-Mirador",164),
-("Harrison-Claudio Carantes",325),
-("Irisan",989),
-("Kias",181),
-("Outlook Drive",96),
-("Padre Burgos",103),
-("Pinget",112),
-("Rock Quarry, Lower",195),
-("San Luis Village",113),
-("Session Road Area",45),
-("Teodora Alonzo",120),
-("Trancoville",22)
-]
-
-df = pd.DataFrame(data, columns=["Barangay", "Affected Families"])
-
-# Random values (for demo only)
-np.random.seed(1)
-df["Casualties"] = np.random.randint(0, 20, size=len(df))
-df["Damaged Houses"] = np.random.randint(10, 300, size=len(df))
-
 # FUNCTIONS
 def normalize(col):
     if col.max() == col.min():
@@ -55,15 +14,12 @@ def normalize(col):
     return (col - col.min()) / (col.max() - col.min())
 
 def compute_priority(df):
-    # Normalize
     df["Norm_Casualties"] = normalize(df["Casualties"])
     df["Norm_Affected"] = normalize(df["Affected Families"])
     df["Norm_Damaged"] = normalize(df["Damaged Houses"])
 
-    # Explicit weights (WSM)
-    w1 = 0.33
-    w2 = 0.33
-    w3 = 0.33
+    # Equal weights (WSM)
+    w1, w2, w3 = 0.33, 0.33, 0.33
 
     df["Priority Score"] = (
         df["Norm_Casualties"] * w1 +
@@ -73,13 +29,56 @@ def compute_priority(df):
 
     return df.sort_values("Priority Score", ascending=False).reset_index(drop=True)
 
-df = compute_priority(df)
+# INITIALIZE QUEUE
+if "df" not in st.session_state:
+    data = [
+        ("A. Bonifacio-Caguioa-Rimando (Abcr)",15),
+        ("Abanao-Zandueta-Kayong-Chugum-Otek (Azkco)",284),
+        ("Alfonso Tabora",26),
+        ("Ambiong",40),
+        ("Andres Bonifacio (Lower Bokawkan)",37),
+        ("Apugan-Loakan",58),
+        ("Asin Road",356),
+        ("Atok Trail",398),
+        ("Aurora Hill Proper (Malvar-Sgt. Floresca)",20),
+        ("Aurora Hill, North Central",58),
+        ("Aurora Hill, South Central",62),
+        ("Bakakeng Central",112),
+        ("Bakakeng North",35),
+        ("Balsigan",40),
+        ("Brookside",261),
+        ("Camp 7",137),
+        ("Campo Filipino",84),
+        ("City Camp Central",308),
+        ("Dominican Hill-Mirador",164),
+        ("Harrison-Claudio Carantes",325),
+        ("Irisan",989),
+        ("Kias",181),
+        ("Outlook Drive",96),
+        ("Padre Burgos",103),
+        ("Pinget",112),
+        ("Rock Quarry, Lower",195),
+        ("San Luis Village",113),
+        ("Session Road Area",45),
+        ("Teodora Alonzo",120),
+        ("Trancoville",22)
+    ]
 
-# SESSION STATE
-if "selected_barangay" not in st.session_state:
+    df = pd.DataFrame(data, columns=["Barangay", "Affected Families"])
+
+    # Random baseline disaster data
+    np.random.seed(1)
+    df["Casualties"] = np.random.randint(0, 20, size=len(df))
+    df["Damaged Houses"] = np.random.randint(10, 300, size=len(df))
+
+    df = compute_priority(df)
+
+    st.session_state.df = df
     st.session_state.selected_barangay = None
 
-# TABS (Inputs and Result)
+df = st.session_state.df
+
+# TABS
 tab1, tab2 = st.tabs(["Input", "Results"])
 
 # TAB 1 — INPUT
@@ -105,26 +104,27 @@ with tab1:
         damaged = st.number_input("Damaged Houses", min_value=0, step=1)
 
     if st.button("Add to Assessment"):
-        # Update selected barangay data
+        df = st.session_state.df
+
+        # Update selected barangay
         df.loc[df["Barangay"] == selected, "Casualties"] = casualties
         df.loc[df["Barangay"] == selected, "Affected Families"] = affected
         df.loc[df["Barangay"] == selected, "Damaged Houses"] = damaged
 
-        # Recompute priority after input
-        updated_df = compute_priority(df)
+        # Recompute priority queue
+        df = compute_priority(df)
 
-        # Save to session
-        st.session_state.df = updated_df
+        st.session_state.df = df
         st.session_state.selected_barangay = selected
 
-        st.success(f"{selected} data updated and prioritized")
+        st.success(f"{selected} updated and queue reordered")
 
 # TAB 2 — RESULTS
 with tab2:
     st.subheader("Disaster Priority Overview")
 
-    df = st.session_state.get("df", df)
-    selected = st.session_state.get("selected_barangay", None)
+    df = st.session_state.df
+    selected = st.session_state.selected_barangay
 
     if selected is None:
         st.warning("Please select and input data in the Input tab first.")
@@ -133,7 +133,7 @@ with tab2:
         rank = df[df["Barangay"] == selected].index[0] + 1
         total = len(df)
 
-        # TOP SUMMARY (POSITION)
+        # SUMMARY
         st.markdown("### Your Barangay Status")
 
         col1, col2, col3, col4 = st.columns(4)
@@ -141,7 +141,7 @@ with tab2:
         col1.metric("Rank", f"#{rank}")
         col2.metric("Out of", total)
         col3.metric("Priority Score", f"{selected_row['Priority Score']:.3f}")
-        
+
         if rank == 1:
             level = "HIGH PRIORITY"
         elif rank <= 5:
@@ -153,7 +153,7 @@ with tab2:
 
         st.markdown("---")
 
-        # VISUAL POSITION (FEELS LIKE PROGRESS)
+        # PROGRESS BAR
         st.markdown("### 📈 Position in Queue")
 
         progress = 1 - (rank / total)
@@ -161,14 +161,14 @@ with tab2:
 
         st.caption(f"{selected} is ahead of {total - rank} barangays")
 
-        # TOP PRIORITY
+        # TOP 5
         st.markdown("---")
         st.markdown("### Top Priority Barangays")
 
         top5 = df.head(5)
 
         for i, row in top5.iterrows():
-            badge = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][i]
+            badge = ["1", "2", "3", "4", "5"][i]
 
             st.markdown(f"""
             <div style="padding:10px; border-radius:8px; margin:5px 0; background-color:#f8f9fa;">
@@ -177,9 +177,9 @@ with tab2:
             </div>
             """, unsafe_allow_html=True)
 
-        # SELECTED BARANGAY DETAIL
+        # DETAILS
         st.markdown("---")
-        st.markdown("Detailed Impact")
+        st.markdown("### Detailed Impact")
 
         col1, col2, col3 = st.columns(3)
 
@@ -187,9 +187,9 @@ with tab2:
         col2.metric("Casualties", int(selected_row["Casualties"]))
         col3.metric("Damaged Houses", int(selected_row["Damaged Houses"]))
 
-        # RESPONSE TIMELINE
+        # RESPONSE TIME
         st.markdown("---")
-        st.markdown("### ⏱️ Response Estimate")
+        st.markdown("### Response Estimate")
 
         if rank == 1:
             msg = "Immediate response (within 24 hours)"
@@ -201,4 +201,3 @@ with tab2:
             msg = "Monitoring / delayed response"
 
         st.info(msg)
-    
