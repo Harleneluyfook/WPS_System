@@ -133,8 +133,28 @@ with tab2:
         rank = df[df["Barangay"] == selected].index[0] + 1
         total = len(df)
 
-        # SUMMARY
-        st.markdown("### Your Barangay Status")
+        # In QUEUE
+        top = df.iloc[0]
+
+        st.markdown("##  Now Serving")
+        st.markdown(f"""
+        <div style="
+            padding:15px;
+            border-radius:10px;
+            background-color:#ffe5e5;
+            border-left:6px solid #ff4b4b;
+        ">
+            <strong>{top['Barangay']}</strong><br>
+            Score: {top['Priority Score']:.3f} |
+            Affected: {int(top['Affected Families'])} |
+            Casualties: {int(top['Casualties'])} |
+            Damaged: {int(top['Damaged Houses'])}
+        </div>
+        """, unsafe_allow_html=True)
+
+        # BARANGAY STATUS
+        st.markdown("---")
+        st.markdown("##  Your Barangay Status")
 
         col1, col2, col3, col4 = st.columns(4)
 
@@ -151,35 +171,55 @@ with tab2:
 
         col4.metric("Priority Level", level)
 
-        st.markdown("---")
-
-        # PROGRESS BAR
+        #  POSITION
         st.markdown("### Position in Queue")
-
         progress = 1 - (rank / total)
         st.progress(progress)
-
         st.caption(f"{selected} is ahead of {total - rank} barangays")
 
-        # TOP 5
+        # FULL QUEUE (MAIN FEATURE)
         st.markdown("---")
-        st.markdown("### Top Priority Barangays")
+        st.markdown("##  Priority Queue")
 
-        top5 = df.head(5)
+        df_display = df.copy()
+        df_display["Rank"] = df_display.index + 1
 
-        for i, row in top5.iterrows():
-            badge = ["1", "2", "3", "4", "5"][i]
+        for i, row in df_display.iterrows():
+            r = int(row["Rank"])
+
+            # Softer colors (clean UI)
+            if r == 1:
+                bg = "#ffe5e5"
+                border = "#ff4b4b"
+            elif r <= 3:
+                bg = "#fff4e5"
+                border = "#ffa500"
+            elif r <= 10:
+                bg = "#e6f0ff"
+                border = "#4b8bff"
+            else:
+                bg = "#f5f5f5"
+                border = "#999"
 
             st.markdown(f"""
-            <div style="padding:10px; border-radius:8px; margin:5px 0; background-color:#f8f9fa;">
-                <strong>{badge} {row['Barangay']}</strong><br>
-                Score: {row['Priority Score']:.3f}
+            <div style="
+                padding:10px;
+                margin:6px 0;
+                border-radius:8px;
+                background-color:{bg};
+                border-left:5px solid {border};
+            ">
+                <strong>#{r} — {row['Barangay']}</strong><br>
+                Score: {row['Priority Score']:.3f} |
+                Affected: {int(row['Affected Families'])} |
+                Casualties: {int(row['Casualties'])} |
+                Damaged: {int(row['Damaged Houses'])}
             </div>
             """, unsafe_allow_html=True)
 
         # DETAILS
         st.markdown("---")
-        st.markdown("### Detailed Impact")
+        st.markdown("##  Impact Breakdown")
 
         col1, col2, col3 = st.columns(3)
 
@@ -187,9 +227,9 @@ with tab2:
         col2.metric("Casualties", int(selected_row["Casualties"]))
         col3.metric("Damaged Houses", int(selected_row["Damaged Houses"]))
 
-        # RESPONSE TIME
+        #  RESPONSE
         st.markdown("---")
-        st.markdown("### Response Estimate")
+        st.markdown("##  Response Plan")
 
         if rank == 1:
             msg = "Immediate response (within 24 hours)"
@@ -201,40 +241,3 @@ with tab2:
             msg = "Monitoring / delayed response"
 
         st.info(msg)
-    
-# FULL PRIORITY QUEUE
-st.markdown("---")
-st.markdown("##  Full Priority Queue")
-
-df_display = df.copy()
-df_display["Rank"] = df_display.index + 1
-
-for i, row in df_display.iterrows():
-    rank = int(row["Rank"])
-
-    # Highlight top 3
-    if rank == 1:
-        color = "#ff4b4b"   # red
-    elif rank == 2:
-        color = "#ff944d"   # orange
-    elif rank == 3:
-        color = "#ffd11a"   # yellow
-    else:
-        color = "#1f77b4"   # blue
-
-    st.markdown(f"""
-    <div style="
-        padding:12px;
-        margin:6px 0;
-        border-radius:10px;
-        background-color:{color};
-        color:white;
-        font-weight:600;
-    ">
-        #{rank} — {row['Barangay']} <br>
-        Score: {row['Priority Score']:.3f} |
-        Affected: {int(row['Affected Families'])} |
-        Casualties: {int(row['Casualties'])} |
-        Damaged: {int(row['Damaged Houses'])}
-    </div>
-    """, unsafe_allow_html=True)
