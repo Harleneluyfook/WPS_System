@@ -173,17 +173,27 @@ with tab2:
 
         #  POSITION
         position_score = (total - rank) / (total - 1) if total > 1 else 1
-        st.progress(position_score)
+        position_percent = round(position_score * 100, 1)
+        st.slider(
+            "Your Position in Queue",
+            min_value=0.0,
+            max_value=100.0,
+            value=position_percent,
+            step=0.1,
+            disabled=True,
+            help="Higher value = higher priority (closer to the front of the response queue)."
+        )
+
+        # Add textual guide
         st.markdown(
-             """
-             <div style="display:flex; justify-content:space-between; font-size:13px; margin-top:-10px;">
-                 <span>Low Priority</span>
-                 <span>High Priority</span>
-            </div>
-            """,
+            "<div style='display:flex; justify-content:space-between; font-size:13px;'>"
+            "<span>Low Priority</span>"
+            "<span>High Priority</span>"
+            "</div>",
             unsafe_allow_html=True
         )
-        st.caption(f"Your position: Rank #{rank} of {total}")
+
+        st.caption(f"Rank #{rank} of {total} barangays")
 
         #  RESPONSE
         st.markdown("---")
