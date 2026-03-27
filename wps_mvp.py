@@ -188,10 +188,13 @@ with tab2:
 
         #  POSITION
         st.markdown("###  Position in Queue")
-        position_bar = ["⬜"] * total
-        position_bar[rank - 1] = "🔴"
-        st.write("".join(position_bar))
-        st.caption(f"Position #{rank} out of {total}")
+        # Create number line
+        numbers = [str(i+1) for i in range(total)]
+        markers = ["   "] * total
+        markers[rank - 1] = " 🔴 "
+        st.markdown(" ".join(numbers))
+        st.markdown(" ".join(markers))
+        st.caption(f"You are at position #{rank} out of {total}")
 
         # FULL QUEUE (MAIN FEATURE)
         st.markdown("---")
