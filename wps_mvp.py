@@ -172,18 +172,23 @@ with tab2:
         col4.metric("Priority Level", level)
 
         #  POSITION
-        min_rank = 1
-        max_rank = total
-        current_rank = rank  
+        total_barangays = total  
+        position_value = float(rank)
         st.slider(
-            "Your position in the disaster priority queue",
-            min_value=min_rank,
-            max_value=max_rank,
-            value=current_rank,
-            step=1,
-            format="%d",
+            "Your Position in Queue",
+            min_value=1.0,
+            max_value=float(total_barangays),
+            value=position_value,
+            step=1.0,
             disabled=True, 
+            format="%d"
         )
+        st.markdown(
+            f"<div style='display:flex; justify-content:space-between; font-size:13px;'>"
+            f"<span>1</span><span>{total_barangays}</span></div>",
+            unsafe_allow_html=True
+        )
+        st.caption(f"Your barangay is ranked #{rank} out of {total_barangays}")
         
         #  RESPONSE
         st.markdown("---")
