@@ -182,9 +182,8 @@ with tab2:
             value=current_rank,
             step=1,
             format="%d",
-            disabled=True,  # make it read-only
+            disabled=True, 
         )
-        st.caption("1 = highest priority • higher number = lower priority")
         
         #  RESPONSE
         st.markdown("---")
