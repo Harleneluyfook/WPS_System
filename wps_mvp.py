@@ -187,19 +187,18 @@ with tab2:
         st.info(msg)
 
         #  POSITION
-        st.markdown("###  Position in Queue")
-        # Create number line
-        line = ""
-        marker_line = ""
-        for i in range(1, total + 1):
-            line += f"{i:>3}"
-            if i == rank:
-                marker_line += " 🔴"
-            else:
-                marker_line += "   "
-        st.text(line)
-        st.text(marker_line)
-        st.caption(f"You are at position #{rank} out of {total}")
+        position_score = (total - rank) / (total - 1) if total > 1 else 1
+        st.progress(position_score)
+        st.markdown(
+             """
+             <div style="display:flex; justify-content:space-between; font-size:13px; margin-top:-10px;">
+                 <span>Low Priority</span>
+                 <span>High Priority</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        st.caption(f"Your position: Rank #{rank} of {total}")
 
         # FULL QUEUE (MAIN FEATURE)
         st.markdown("---")
