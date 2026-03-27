@@ -136,7 +136,7 @@ with tab2:
         # In QUEUE
         top = df.iloc[0]
 
-        st.markdown("##  Now Serving")
+        st.markdown("##  Highest Priority Area")
         st.markdown(f"""
         <div style="
             padding:15px;
@@ -171,11 +171,27 @@ with tab2:
 
         col4.metric("Priority Level", level)
 
+        #  RESPONSE
+        st.markdown("---")
+        st.markdown("##  Response Plan")
+
+        if rank == 1:
+            msg = "Immediate response (within 24 hours)"
+        elif rank <= 3:
+            msg = "Urgent (24–48 hours)"
+        elif rank <= 6:
+            msg = "Scheduled (2–3 days)"
+        else:
+            msg = "Monitoring / delayed response"
+
+        st.info(msg)
+
         #  POSITION
-        st.markdown("### Position in Queue")
-        progress = 1 - (rank / total)
-        st.progress(progress)
-        st.caption(f"{selected} is ahead of {total - rank} barangays")
+        st.markdown("###  Position in Queue")
+        position_bar = ["⬜"] * total
+        position_bar[rank - 1] = "🔴"
+        st.write("".join(position_bar))
+        st.caption(f"Position #{rank} out of {total}")
 
         # FULL QUEUE (MAIN FEATURE)
         st.markdown("---")
@@ -227,17 +243,3 @@ with tab2:
         col2.metric("Casualties", int(selected_row["Casualties"]))
         col3.metric("Damaged Houses", int(selected_row["Damaged Houses"]))
 
-        #  RESPONSE
-        st.markdown("---")
-        st.markdown("##  Response Plan")
-
-        if rank == 1:
-            msg = "Immediate response (within 24 hours)"
-        elif rank <= 3:
-            msg = "Urgent (24–48 hours)"
-        elif rank <= 6:
-            msg = "Scheduled (2–3 days)"
-        else:
-            msg = "Monitoring / delayed response"
-
-        st.info(msg)
