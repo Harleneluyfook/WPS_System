@@ -172,28 +172,35 @@ with tab2:
         col4.metric("Priority Level", level)
 
         #  POSITION
-        position_score = (total - rank) / (total - 1) if total > 1 else 1
-        position_percent = round(position_score * 100, 1)
-        st.slider(
-            "Your Position in Queue",
-            min_value=0.0,
-            max_value=100.0,
-            value=position_percent,
-            step=0.1,
-            disabled=True,
-            help="Higher value = higher priority (closer to the front of the response queue)."
-        )
+        # Relative position
+        position = rank / total
 
-        # Add textual guide
-        st.markdown(
-            "<div style='display:flex; justify-content:space-between; font-size:13px;'>"
-            "<span>Low Priority</span>"
-            "<span>High Priority</span>"
-            "</div>",
-            unsafe_allow_html=True
-        )
+        # HTML bar container
+        st.markdown(f"""
+        <div style="position: relative; height: 30px; background-color: #e0e0e0; border-radius: 15px;">
+            <div style="
+                width: {position*100}%;
+                height: 100%;
+                background-color: #1f77b4;
+                border-radius: 15px;
+                transition: width 0.5s;
+            "></div>
+            <div style="
+                position: absolute;
+                left: {position*100}%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                font-weight: bold;
+                color: black;
+            ">⬤</div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; margin-top:2px;">
+            <span>Rank 1</span>
+            <span>Rank {total}</span>
+        </div>
+        """, unsafe_allow_html=True)
 
-        st.caption(f"Rank #{rank} of {total} barangays")
+        st.caption(f"Your Barangay: {selected} — Rank #{rank} of {total}")
 
         #  RESPONSE
         st.markdown("---")
