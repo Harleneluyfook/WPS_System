@@ -171,6 +171,20 @@ with tab2:
 
         col4.metric("Priority Level", level)
 
+        #  POSITION
+        position_score = (total - rank) / (total - 1) if total > 1 else 1
+        st.progress(position_score)
+        st.markdown(
+             """
+             <div style="display:flex; justify-content:space-between; font-size:13px; margin-top:-10px;">
+                 <span>Low Priority</span>
+                 <span>High Priority</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        st.caption(f"Your position: Rank #{rank} of {total}")
+
         #  RESPONSE
         st.markdown("---")
         st.markdown("##  Response Plan")
@@ -185,20 +199,6 @@ with tab2:
             msg = "Monitoring / delayed response"
 
         st.info(msg)
-
-        #  POSITION
-        position_score = (total - rank) / (total - 1) if total > 1 else 1
-        st.progress(position_score)
-        st.markdown(
-             """
-             <div style="display:flex; justify-content:space-between; font-size:13px; margin-top:-10px;">
-                 <span>Low Priority</span>
-                 <span>High Priority</span>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        st.caption(f"Your position: Rank #{rank} of {total}")
 
         # FULL QUEUE (MAIN FEATURE)
         st.markdown("---")
