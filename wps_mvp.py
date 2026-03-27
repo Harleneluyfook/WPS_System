@@ -172,36 +172,20 @@ with tab2:
         col4.metric("Priority Level", level)
 
         #  POSITION
-        # Relative position
-        position = rank / total
-
-        # HTML bar container
-        st.markdown(f"""
-        <div style="position: relative; height: 30px; background-color: #e0e0e0; border-radius: 15px;">
-            <div style="
-                width: {position*100}%;
-                height: 100%;
-                background-color: #1f77b4;
-                border-radius: 15px;
-                transition: width 0.5s;
-            "></div>
-            <div style="
-                position: absolute;
-                left: {position*100}%;
-                top: 50%;
-                transform: translate(-50%, -50%);
-                font-weight: bold;
-                color: black;
-            ">⬤</div>
-        </div>
-        <div style="display:flex; justify-content:space-between; font-size:13px; margin-top:2px;">
-            <span>Rank 1</span>
-            <span>Rank {total}</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.caption(f"Your Barangay: {selected} — Rank #{rank} of {total}")
-
+        min_rank = 1
+        max_rank = total
+        current_rank = rank  
+        st.slider(
+            "Your position in the disaster priority queue",
+            min_value=min_rank,
+            max_value=max_rank,
+            value=current_rank,
+            step=1,
+            format="%d",
+            disabled=True,  # make it read-only
+        )
+        st.caption("1 = highest priority • higher number = lower priority")
+        
         #  RESPONSE
         st.markdown("---")
         st.markdown("##  Response Plan")
